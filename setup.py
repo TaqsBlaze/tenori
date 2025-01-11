@@ -11,7 +11,7 @@ with open("requirements.txt", encoding="utf-8") as f:
 
 setup(
     name="tenori",
-    version="1.0.0",
+    version="1.1.0",
     author="Tanaka Chinengundu",
     author_email="tanakah30@gmail.com",
     description="A Flask package for easily adding multi-tenancy with dedicated databases",
