@@ -4,11 +4,11 @@ from sqlalchemy import text
 from .exceptions import DatabaseCreationError
 import re
 from flask import current_app
+from flask_sqlalchemy import SQLAlchemy
 
 class DatabaseManager:
     def __init__(self, db_instance):
         self.db = db_instance
-        # Store db_instance but don't access engine yet
         self._db_instance = db_instance
         self._engine = None
 
@@ -40,14 +40,33 @@ class DatabaseManager:
             # Create database if it doesn't exist
             with self.engine.connect() as conn:
                 conn.execute(text(f"""
-                                  CREATE USER '{tenant_identifier.username}'@'localhost' IDENTIFIED VIA mysql_native_password USING '{tenant_identifier.password}';GRANT SELECT, INSERT, UPDATE, DELETE, FILE ON *.* TO '{tenant_identifier.username}'@'localhost' REQUIRE NONE WITH MAX_QUERIES_PER_HOUR 0 MAX_CONNECTIONS_PER_HOUR 0 MAX_UPDATES_PER_HOUR 0 MAX_USER_CONNECTIONS 0;CREATE DATABASE IF NOT EXISTS `{tenant_identifier.username}`;GRANT ALL PRIVILEGES ON `{tenant_identifier.username}`.* TO '{tenant_identifier.username}'@'localhost';"""
-                                  ))
+                    CREATE USER '{tenant_identifier.username}'@'localhost' IDENTIFIED VIA mysql_native_password USING '{tenant_identifier.password}';
+                    GRANT SELECT, INSERT, UPDATE, DELETE, FILE ON *.* TO '{tenant_identifier.username}'@'localhost' 
+                    REQUIRE NONE WITH MAX_QUERIES_PER_HOUR 0 MAX_CONNECTIONS_PER_HOUR 0 MAX_UPDATES_PER_HOUR 0 MAX_USER_CONNECTIONS 0;
+                    CREATE DATABASE IF NOT EXISTS `{db_name}`;
+                    GRANT ALL PRIVILEGES ON `{db_name}`.* TO '{tenant_identifier.username}'@'localhost';
+                """))
                 
-                # Test connection to new database
-                test_engine = sa.create_engine(
-                    f"{self.engine.url.drivername}://{self.engine.url.username}:{self.engine.url.password}@{self.engine.url.host}/{db_name}"
+                # Create a new SQLAlchemy instance for the tenant's database
+                tenant_engine = sa.create_engine(
+                    f"{self.engine.url.drivername}://{tenant_identifier.username}:{tenant_identifier.password}@{self.engine.url.host}/{db_name}"
                 )
-                test_engine.connect().close()
+                
+                # Create all tables in the new database
+                with current_app.app_context():
+                    # Store the original engine
+                    original_engine = self._db_instance.engine
+                    
+                    try:
+                        # Temporarily set the engine to the tenant's engine
+                        self._db_instance.engine = tenant_engine
+                        
+                        # Create all tables
+                        self._db_instance.create_all()
+                        
+                    finally:
+                        # Restore the original engine
+                        self._db_instance.engine = original_engine
                 
             return True
             
