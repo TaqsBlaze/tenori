@@ -39,13 +39,11 @@ class DatabaseManager:
             
             # Create database if it doesn't exist
             with self.engine.connect() as conn:
-                conn.execute(text(f"""
-                    CREATE USER '{tenant_identifier.username}'@'localhost' IDENTIFIED VIA mysql_native_password USING '{tenant_identifier.password}';
-                    GRANT SELECT, INSERT, UPDATE, DELETE, FILE ON *.* TO '{tenant_identifier.username}'@'localhost' 
-                    REQUIRE NONE WITH MAX_QUERIES_PER_HOUR 0 MAX_CONNECTIONS_PER_HOUR 0 MAX_UPDATES_PER_HOUR 0 MAX_USER_CONNECTIONS 0;
-                    CREATE DATABASE IF NOT EXISTS `{db_name}`;
-                    GRANT ALL PRIVILEGES ON `{db_name}`.* TO '{tenant_identifier.username}'@'localhost';
-                """))
+                conn.execute(text(f"CREATE USER '{tenant_identifier.username}'@'localhost' IDENTIFIED VIA mysql_native_password USING '{tenant_identifier.password}';"))
+                conn.execute(text(f"GRANT SELECT, INSERT, UPDATE, DELETE, FILE ON *.* TO '{tenant_identifier.username}'@'localhost' REQUIRE NONE WITH MAX_QUERIES_PER_HOUR 0 MAX_CONNECTIONS_PER_HOUR 0 MAX_UPDATES_PER_HOUR 0 MAX_USER_CONNECTIONS 0;"))
+                conn.execute(text(f"CREATE DATABASE IF NOT EXISTS `{db_name}`;"))
+                conn.execute(text(f"GRANT ALL PRIVILEGES ON `{db_name}`.* TO '{tenant_identifier.username}'@'localhost';"))
+
                 
                 # Create a new SQLAlchemy instance for the tenant's database
                 tenant_engine = sa.create_engine(
