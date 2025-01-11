@@ -29,7 +29,7 @@ class MultiTenantManager:
             raise InvalidConfigurationError("User object must have an 'id' attribute")
 
         tenant_id = str(user.id)
-        return self.db_manager.create_tenant_database(tenant_id)
+        return self.db_manager.create_tenant_database(user)
 
     def get_tenant_connection(self, user: Any) -> str:
         """

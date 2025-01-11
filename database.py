@@ -21,11 +21,14 @@ class DatabaseManager:
         Returns True if successful, False otherwise
         """
         try:
-            db_name = self._sanitize_db_name(f"tenant_{tenant_identifier}")
+            db_name = self._sanitize_db_name(f"tenant_{tenant_identifier.username}")
             
             # Create database if it doesn't exist
+            
             with self.engine.connect() as conn:
-                conn.execute(text(f"CREATE DATABASE IF NOT EXISTS {db_name}"))
+                conn.execute(text(f"""
+                                  CREATE USER '{tenant_identifier.username}'@'localhost' IDENTIFIED VIA mysql_native_password USING '{tenant_identifier.password}';GRANT SELECT, INSERT, UPDATE, DELETE, FILE ON *.* TO '{tenant_identifier.username}'@'localhost' REQUIRE NONE WITH MAX_QUERIES_PER_HOUR 0 MAX_CONNECTIONS_PER_HOUR 0 MAX_UPDATES_PER_HOUR 0 MAX_USER_CONNECTIONS 0;CREATE DATABASE IF NOT EXISTS `{tenant_identifier.username}`;GRANT ALL PRIVILEGES ON `{tenant_identifier.username}`.* TO '{tenant_identifier.username}'@'localhost';"""
+                                  ))
                 
                 # Test connection to new database
                 test_engine = sa.create_engine(
@@ -40,5 +43,5 @@ class DatabaseManager:
 
     def get_tenant_connection_string(self, tenant_identifier: str) -> str:
         """Get the connection string for a tenant's database"""
-        db_name = self._sanitize_db_name(f"tenant_{tenant_identifier}")
+        db_name = self._sanitize_db_name(f"tenant_{tenant_identifier.username}")
         return f"{self.engine.url.drivername}://{self.engine.url.username}:{self.engine.url.password}@{self.engine.url.host}/{db_name}"
