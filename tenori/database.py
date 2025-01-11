@@ -3,15 +3,29 @@ import sqlalchemy as sa
 from sqlalchemy import text
 from .exceptions import DatabaseCreationError
 import re
+from flask import current_app
 
 class DatabaseManager:
     def __init__(self, db_instance):
         self.db = db_instance
-        self.engine = db_instance.engine
+        # Store db_instance but don't access engine yet
+        self._db_instance = db_instance
+        self._engine = None
+
+    @property
+    def engine(self):
+        """Lazy load engine only when needed and within app context"""
+        if self._engine is None:
+            if not current_app:
+                raise RuntimeError(
+                    "No application context found. "
+                    "Initialize MultiTenantManager within a Flask app context or route."
+                )
+            self._engine = self._db_instance.engine
+        return self._engine
 
     def _sanitize_db_name(self, name: str) -> str:
         """Sanitize database name to prevent SQL injection"""
-        # Remove special characters and spaces, keep alphanumeric and underscore
         sanitized = re.sub(r'[^a-zA-Z0-9_]', '', name)
         return sanitized.lower()
 
@@ -24,7 +38,6 @@ class DatabaseManager:
             db_name = self._sanitize_db_name(f"tenant_{tenant_identifier.username}")
             
             # Create database if it doesn't exist
-            
             with self.engine.connect() as conn:
                 conn.execute(text(f"""
                                   CREATE USER '{tenant_identifier.username}'@'localhost' IDENTIFIED VIA mysql_native_password USING '{tenant_identifier.password}';GRANT SELECT, INSERT, UPDATE, DELETE, FILE ON *.* TO '{tenant_identifier.username}'@'localhost' REQUIRE NONE WITH MAX_QUERIES_PER_HOUR 0 MAX_CONNECTIONS_PER_HOUR 0 MAX_UPDATES_PER_HOUR 0 MAX_USER_CONNECTIONS 0;CREATE DATABASE IF NOT EXISTS `{tenant_identifier.username}`;GRANT ALL PRIVILEGES ON `{tenant_identifier.username}`.* TO '{tenant_identifier.username}'@'localhost';"""
@@ -43,5 +56,5 @@ class DatabaseManager:
 
     def get_tenant_connection_string(self, tenant_identifier: str) -> str:
         """Get the connection string for a tenant's database"""
-        db_name = self._sanitize_db_name(f"tenant_{tenant_identifier.username}")
+        db_name = self._sanitize_db_name(f"tenant_{tenant_identifier}")
         return f"{self.engine.url.drivername}://{self.engine.url.username}:{self.engine.url.password}@{self.engine.url.host}/{db_name}"
