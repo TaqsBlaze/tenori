@@ -4,7 +4,6 @@
 ![alt text](https://raw.githubusercontent.com/TaqsBlaze/tenori/refs/heads/main/logo/tenori.png)
 
 # Tenori
-
 ### Flask Multi Tenant Package
 </center>
 A lightweight, secure Python package for easily adding multi tenancy to Flask applications using dedicated databases per tenant.
