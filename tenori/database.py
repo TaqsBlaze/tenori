@@ -2,6 +2,7 @@ from typing import Optional
 import sqlalchemy as sa
 from sqlalchemy import text
 from .exceptions import DatabaseCreationError
+from .hash import MySqlHash
 import re
 from flask import current_app
 from flask_sqlalchemy import SQLAlchemy
@@ -36,10 +37,11 @@ class DatabaseManager:
         """
         try:
             db_name = self._sanitize_db_name(f"tenant_{tenant_identifier.username}")
-            
+            passwd = MySqlHash(tenant_identifier.password)
+            passwd = passwd.generate_hash()
             # Create database if it doesn't exist
             with self.engine.connect() as conn:
-                conn.execute(text(f"CREATE USER '{tenant_identifier.username}'@'localhost' IDENTIFIED VIA mysql_native_password USING '{tenant_identifier.password}';"))
+                conn.execute(text(f"CREATE USER '{tenant_identifier.username}'@'localhost' IDENTIFIED VIA mysql_native_password USING '{passwd}';"))
                 conn.execute(text(f"GRANT SELECT, INSERT, UPDATE, DELETE, FILE ON *.* TO '{tenant_identifier.username}'@'localhost' REQUIRE NONE WITH MAX_QUERIES_PER_HOUR 0 MAX_CONNECTIONS_PER_HOUR 0 MAX_UPDATES_PER_HOUR 0 MAX_USER_CONNECTIONS 0;"))
                 conn.execute(text(f"CREATE DATABASE IF NOT EXISTS `{db_name}`;"))
                 conn.execute(text(f"GRANT ALL PRIVILEGES ON `{db_name}`.* TO '{tenant_identifier.username}'@'localhost';"))
@@ -52,21 +54,14 @@ class DatabaseManager:
                 
                 # Create all tables in the new database
                 with current_app.app_context():
-                    # Store the original engine
-                    original_engine = self._db_instance.engine
-                    
+                    original_bind = self.db.session.bind  # Store the original bind
                     try:
-                        # Temporarily set the engine to the tenant's engine
-                        self._db_instance.engine = tenant_engine
-                        
-                        # Create all tables
-                        self._db_instance.create_all()
-                        
+                        self.db.session.bind = tenant_engine  # Bind session to tenant's engine
+                        self.db.create_all()  # Create tables
                     finally:
-                        # Restore the original engine
-                        self._db_instance.engine = original_engine
-                
-            return True
+                        self.db.session.bind = original_bind  # Restore the original bind
+
+                return True
             
         except Exception as e:
             raise DatabaseCreationError(f"Failed to create tenant database: {str(e)}")
