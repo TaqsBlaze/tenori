@@ -52,6 +52,7 @@ def create_tenant():
 - Flask
 - Flask-SQLAlchemy
 - SQLAlchemy
+- MySQL Database
 
 ## Configuration
 
