@@ -39,7 +39,7 @@ tenant_manager = MultiTenantManager(db)
 @app.route('/signup', methods=['POST'])
 def create_tenant():
     try:
-        success = tenant_manager.create_tenant(current_user)
+        success = tenant_manager.create_tenant(user)
         if success:
             return {"status": "success"}
     except Exception as e:
